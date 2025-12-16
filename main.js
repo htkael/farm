@@ -1,12 +1,189 @@
-class Animal {
+import { getAllMethods, getChildName } from "./helpers.js"
+import Shell from "./shell.js"
+
+export class World {
+  constructor() {
+    this.animals = []
+    this.interval = 0
+  }
+
+  addAnimal(animal) {
+    this.animals.push(animal)
+    console.log(`${animal.species} entered the world!`)
+  }
+
+  randomInteraction() {
+    if (this.animals.length < 2) return
+
+    const animal1 = this.animals[Math.floor(Math.random() * this.animals.length)]
+    const animal2 = this.animals[Math.floor(Math.random() * this.animals.length)]
+
+    if (animal1.health <= 0) return
+
+    if (animal1 === animal2) return
+
+    const action = Math.random()
+
+    const animalActions = getAllMethods(animal1)
+    const baseMethodsToExclude = ['constructor', 'breedWith', 'takeDamage']
+    const availableActions = animalActions.filter(method => !baseMethodsToExclude.includes(method))
+
+    if (action < 0.3) {
+      if (availableActions.length > 0) {
+        const randomMethod = availableActions[Math.floor(Math.random() * availableActions.length)]
+        console.log(`${animal1.name || animal1.species} uses ${randomMethod}!`)
+
+        const methodsThatNeedTarget = ['attack', 'heal', 'bite', 'eviscerate', 'sacrifice', 'attack', 'devour']
+        if (methodsThatNeedTarget.includes(randomMethod)) {
+          animal1[randomMethod](animal2)
+        } else {
+          animal1[randomMethod]()
+        }
+      }
+    } else if (action < 0.7 && typeof animal1.breedWith === 'function') {
+      const baby = animal1.breedWith(animal2)
+      if (baby) {
+        console.log(`A new ${baby.species} was born: ${baby.name}!`)
+        this.addAnimal(baby)
+      }
+    } else if (action >= 0.995) {
+      const mutant = this.createMutant(animal1, animal2)
+      console.log(`🧬 MUTATION! A new species has evolved: ${mutant.species}!`)
+      this.addAnimal(mutant)
+    }
+  }
+
+  createMutant(parent1, parent2) {
+    const mutantSpecies = getChildName(parent1.species, parent2.species)
+    const mutantSound = this.mutateTrait(parent1.sound, parent2.sound, "sound")
+    const mutantFood = this.mutateTrait(parent1.food, parent2.food, "food")
+    const mutantHealth = Math.floor((parent1.maxHealth + parent2.maxHealth) / 2) + Math.floor(Math.random() * 10 - 5)
+    const mutantName = `${mutantSpecies}-Alpha`
+
+    const mutant = new Animal(mutantSpecies, mutantSound, mutantFood, mutantHealth)
+    mutant.name = mutantName
+
+    this.giveRandomAbility(mutant, parent1, parent2)
+
+    return mutant
+  }
+
+  mutateTrait(trait1, trait2, traitType) {
+    const mutation = Math.random()
+    if (mutation < 0.4) return trait1
+    if (mutation < 0.8) return trait2
+
+    return this.generateRandomTrait(trait1, trait2, traitType)
+  }
+
+  generateRandomTrait(trait1, trait2, traitType) {
+    const sounds = ['ROAR!', "Meow!", "Screech!", "Chirp!", "Glorp!", "Brrrr...", "Howl!", "Moooo!", "Bing Bong!"]
+    const foods = ['Meat', 'Berries', 'Fish', 'Insects', 'Grass', 'Bones']
+
+    if (traitType === "sound") {
+      return sounds[Math.floor(Math.random() * sounds.length)]
+    } else if (traitType === "food") {
+      return foods[Math.floor(Math.random() * foods.length)]
+    } else {
+      return Math.random() < 0.5 ? trait1 : trait2
+    }
+  }
+
+  giveRandomAbility(mutant, parent1, parent2) {
+    const abilities = [
+      () => {
+        mutant.bite = function(otherAnimal) {
+          console.log(`${this?.name || this?.species} bit ${otherAnimal?.name || otherAnimal?.species}`)
+          otherAnimal.takeDamage(8)
+        }
+      },
+      () => {
+        mutant.regenerate = function() {
+          this.health = Math.min(this.health + 10, this.maxHealth)
+          console.log(`${this?.name || this.species} regenerated. Current health: ${this.health}`)
+        }
+      },
+      () => {
+        mutant.eviscerate = function(otherAnimal) {
+          console.log(`${this?.name || this?.species} eviscerated ${otherAnimal?.name || otherAnimal?.species}`)
+          otherAnimal.takeDamage(15)
+        }
+      },
+      () => {
+        mutant.sacrifice = function(otherAnimal) {
+          console.log(`${this?.name || this?.species} made the ultimate sacrifice. ${otherAnimal?.name || otherAnimal?.species} and it have died.`)
+          this.health = 0
+          otherAnimal.health = 0
+        }
+      }
+    ]
+
+    const numGiven = Math.random() > 0.5 ? 1 : 2
+
+    for (let i = 0; i < numGiven; i++) {
+      const randomAbility = abilities[Math.floor(Math.random() * abilities.length)]
+      randomAbility()
+    }
+
+    console.log(`New abilities: ${Object.keys(mutant).filter(k => typeof mutant[k] === 'function' && !['makeSound', 'eat', 'attack', 'takeDamage', 'breedWith', 'heal', 'devour'].includes(k)).join(', ')}`)
+
+    mutant.breedWith = function(other) {
+      if (this.species !== other.species) return null
+
+      const childName = getChildName(this.name, other.name)
+      const childHealth = Math.floor((this.health + other.health) / 2)
+
+      const child = new Animal(this.species, this.sound, this.food, childHealth)
+      child.name = childName
+
+      for (let key in this) {
+        if (typeof this[key] === 'function' && !['makeSound', 'eat', 'attack', 'takeDamage', 'breedWith', 'heal', 'devour'].includes(key)) {
+          child[key] = this[key]
+        }
+      }
+
+      child.breedWith = this.breedWith
+
+      console.log(`${this.name} and ${other.name} had a ${this.species} baby!`)
+
+      return child
+    }
+  }
+
+  startSimulation(interval = 2000) {
+    setInterval(() => {
+      this.randomInteraction()
+
+      if (this.interval === 5) {
+        this.logPopulation()
+        this.interval = 0
+      }
+
+      this.interval++
+
+    }, interval)
+  }
+
+  logPopulation() {
+    const species = {}
+    this.animals.forEach(a => {
+      if (a.health > 0) {
+        species[a.species] = (species[a.species] || 0) + 1
+      }
+    })
+    console.log(`Population: `, species)
+  }
+}
+
+export class Animal {
   constructor(species, sound, food, health = 10) {
     this.species = species
     this.sound = sound
     this.food = food
-    this.position = [0, 0]
     this.maxHealth = health
     this.health = health
   }
+
 
   makeSound() {
     console.log(this.sound)
@@ -21,30 +198,38 @@ class Animal {
     }
   }
 
-  move() {
-    this.position = [this.position[0] + 1, this.position[1]]
-    console.log(`${this.species} moved. New coordinates: [${this.position}]`)
+  attack(otherAnimal, damage = 5) {
+    console.log(`${this?.name || this.species} attacked ${otherAnimal?.name || otherAnimal.species} for ${damage} damage`)
+    otherAnimal.takeDamage(damage)
   }
 
   takeDamage(damage) {
     this.health -= damage
     if (this.health < 1) {
-      console.log(`Damage taken, health reduced to zero. ${this.species} has died`)
+      console.log(`${this?.name || this.species} took damage, health reduced to zero. ${this?.name || this.species} has died`)
     } else {
-      console.log(`${damage} damage taken. Current health: ${this.health}`)
+      console.log(`${this?.name || this.species} took ${damage} damage. Current health: ${this.health}`)
     }
   }
 }
 
-class Dog extends Animal {
+export class Dog extends Animal {
   constructor(name) {
     super("Dog", "Bark!", "Kibble", 20)
     this.name = name
   }
 
-  leap() {
-    this.position = [this.position[0] + 2, this.position[1]]
-    console.log(`${this.name} (${this.species}) leaped. New coordinates: [${this.position}]`)
+  breedWith(other) {
+    if (!(other instanceof Dog)) return null
+
+    const childName = getChildName(this.name, other.name)
+    const childHealth = Math.floor((this.health + other.health) / 2)
+
+    console.log(`${this.name} and ${other.name} had puppies!`)
+
+    const puppy = new Dog(childName)
+    puppy.health = childHealth
+    return puppy
   }
 
   devour() {
@@ -60,15 +245,213 @@ class Dog extends Animal {
   }
 }
 
+export class Cat extends Animal {
+  constructor(name) {
+    super("Cat", "Meow!", "Tuna", 20)
+    this.name = name
+  }
 
-const Fido = new Dog("Fido")
+  breedWith(other) {
+    if (!(other instanceof Cat)) return null
 
-Fido.makeSound()
-Fido.leap()
-Fido.takeDamage(10)
-Fido.takeDamage(10)
-Fido.eat()
-Fido.devour()
-Fido.devour()
-Fido.makeSound()
-Fido.move()
+    const childName = getChildName(this.name, other.name)
+    const childHealth = Math.floor((this.health + other.health) / 2)
+
+    console.log(`${this.name} and ${other.name} had kittens!`)
+
+    const kitten = new Cat(childName)
+    kitten.health = childHealth
+    return kitten
+  }
+
+  devour() {
+    if (this.health < this.maxHealth) {
+      this.health += 5
+      if (this.health > this.maxHealth) {
+        this.health = this.maxHealth
+      }
+      console.log(`${this.name} devoured ${this.food}. Current health: ${this.health}`)
+    } else {
+      console.log(`${this.name} is already at max health: ${this.health}`)
+    }
+  }
+}
+
+export class Cow extends Animal {
+  constructor(name) {
+    super("Cow", "Mooo!", "Hay", 20)
+    this.name = name
+  }
+
+  breedWith(other) {
+    if (!(other instanceof Cow)) return null
+
+    const childName = getChildName(this.name, other.name)
+    const childHealth = Math.floor((this.health + other.health) / 2)
+
+    console.log(`${this.name} and ${other.name} had a calf!`)
+
+    const calf = new Cow(childName)
+    calf.health = childHealth
+    return calf
+  }
+
+  devour() {
+    if (this.health < this.maxHealth) {
+      this.health += 5
+      if (this.health > this.maxHealth) {
+        this.health = this.maxHealth
+      }
+      console.log(`${this.name} devoured ${this.food}. Current health: ${this.health}`)
+    } else {
+      console.log(`${this.name} is already at max health: ${this.health}`)
+    }
+  }
+}
+
+export class Falcon extends Animal {
+  constructor(name) {
+    super("Falcon", "Caw!", "Mouse", 20)
+    this.name = name
+  }
+
+  breedWith(other) {
+    if (!(other instanceof Falcon)) return null
+
+    const childName = getChildName(this.name, other.name)
+    const childHealth = Math.floor((this.health + other.health) / 2)
+
+    console.log(`${this.name} and ${other.name} had chicks!`)
+
+    const chick = new Falcon(childName)
+    chick.health = childHealth
+    return chick
+  }
+
+  devour() {
+    if (this.health < this.maxHealth) {
+      this.health += 5
+      if (this.health > this.maxHealth) {
+        this.health = this.maxHealth
+      }
+      console.log(`${this.name} devoured ${this.food}. Current health: ${this.health}`)
+    } else {
+      console.log(`${this.name} is already at max health: ${this.health}`)
+    }
+  }
+}
+
+export class Lizard extends Animal {
+  constructor(name) {
+    super("Lizard", "Blep...", "Bug", 20)
+    this.name = name
+  }
+
+  breedWith(other) {
+    if (!(other instanceof Lizard)) return null
+
+    const childName = getChildName(this.name, other.name)
+    const childHealth = Math.floor((this.health + other.health) / 2)
+
+    console.log(`${this.name} and ${other.name} had lizard babies!`)
+
+    const lizardBaby = new Lizard(childName)
+    lizardBaby.health = childHealth
+    return lizardBaby
+  }
+
+  devour() {
+    if (this.health < this.maxHealth) {
+      this.health += 5
+      if (this.health > this.maxHealth) {
+        this.health = this.maxHealth
+      }
+      console.log(`${this.name} devoured ${this.food}. Current health: ${this.health}`)
+    } else {
+      console.log(`${this.name} is already at max health: ${this.health}`)
+    }
+  }
+}
+
+export class Snake extends Animal {
+  constructor(name) {
+    super("Snake", "Sssss!", "Rat", 20)
+    this.name = name
+  }
+
+  breedWith(other) {
+    if (!(other instanceof Snake)) return null
+
+    const childName = getChildName(this.name, other.name)
+    const childHealth = Math.floor((this.health + other.health) / 2)
+
+    console.log(`${this.name} and ${other.name} had snake babies!`)
+
+    const snakeBaby = new Snake(childName)
+    snakeBaby.health = childHealth
+    return snakeBaby
+  }
+
+  devour() {
+    if (this.health < this.maxHealth) {
+      this.health += 5
+      if (this.health > this.maxHealth) {
+        this.health = this.maxHealth
+      }
+      console.log(`${this.name} devoured ${this.food}. Current health: ${this.health}`)
+    } else {
+      console.log(`${this.name} is already at max health: ${this.health}`)
+    }
+  }
+}
+
+export class Turtle extends Animal {
+  constructor(name) {
+    super("Turle", "Clonk...", "Lettuce", 20)
+    this.name = name
+  }
+
+  breedWith(other) {
+    if (!(other instanceof Turtle)) return null
+
+    const childName = getChildName(this.name, other.name)
+    const childHealth = Math.floor((this.health + other.health) / 2)
+
+    console.log(`${this.name} and ${other.name} had baby turtles!`)
+
+    const babyTurtle = new Turtle(childName)
+    babyTurtle.health = childHealth
+    return babyTurtle
+  }
+
+  devour() {
+    if (this.health < this.maxHealth) {
+      this.health += 5
+      if (this.health > this.maxHealth) {
+        this.health = this.maxHealth
+      }
+      console.log(`${this.name} devoured ${this.food}. Current health: ${this.health}`)
+    } else {
+      console.log(`${this.name} is already at max health: ${this.health}`)
+    }
+  }
+}
+
+const world = new World()
+world.addAnimal(new Dog("Fido"))
+world.addAnimal(new Dog("Bella"))
+world.addAnimal(new Cat("Winston"))
+world.addAnimal(new Cat("Mandu"))
+world.addAnimal(new Cow("Robert"))
+world.addAnimal(new Cow("Betsy"))
+world.addAnimal(new Falcon("Scretch"))
+world.addAnimal(new Falcon("Razeala"))
+world.addAnimal(new Lizard("Gleck"))
+world.addAnimal(new Lizard("Zazel"))
+world.addAnimal(new Snake("Tragal"))
+world.addAnimal(new Snake("Azula"))
+world.addAnimal(new Turtle("Grog"))
+world.addAnimal(new Turtle("Petunia"))
+
+const shell = new Shell(world)
+shell.start()
