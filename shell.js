@@ -7,12 +7,6 @@ class Shell {
     this.world = world
     this.simulationInterval = null
     this.isRunning = false
-    this.logBuffer = []
-
-    this.originalLog = console.log
-    console.log = (...args) => {
-      this.customLog(...args)
-    }
 
     this.rl = readline.createInterface({
       input: process.stdin,
@@ -21,19 +15,6 @@ class Shell {
     })
 
     this.setUpListeners()
-  }
-
-  customLog(...args) {
-    const message = args.map(arg =>
-      typeof args === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-    ).join(" ")
-
-    this.rl.output.write(message + '\n')
-
-    this.logBuffer.push(message)
-    if (this.logBuffer.length > 100) {
-      this.logBuffer.shift()
-    }
   }
 
   setUpListeners() {
