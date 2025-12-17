@@ -1,4 +1,4 @@
-import { Cat, Cow, Dog, Falcon, Lizard, Snake, Turtle } from "./main.js"
+import { Cat, Cow, Dog, Falcon, Lizard, } from "./main.js"
 
 export function getChildName(name1, name2) {
   const firstHalf = name1.slice(0, Math.floor(name1.length / 2))
@@ -34,6 +34,4 @@ export const AnimalMap = {
   "cow": (name) => new Cow(name),
   "falcon": (name) => new Falcon(name),
   "lizard": (name) => new Lizard(name),
-  "snake": (name) => new Snake(name),
-  "turtle": (name) => new Turtle(name)
 }

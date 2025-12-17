@@ -25,7 +25,7 @@ export class World {
     const action = Math.random()
 
     const animalActions = getAllMethods(animal1)
-    const baseMethodsToExclude = ['constructor', 'breedWith', 'takeDamage']
+    const baseMethodsToExclude = ['constructor', 'breedWith', 'takeDamage', 'gainXP', 'levelUp']
     const availableActions = animalActions.filter(method => !baseMethodsToExclude.includes(method))
 
     if (action < 0.3) {
@@ -33,7 +33,7 @@ export class World {
         const randomMethod = availableActions[Math.floor(Math.random() * availableActions.length)]
         console.log(`${animal1.name || animal1.species} uses ${randomMethod}!`)
 
-        const methodsThatNeedTarget = ['attack', 'heal', 'bite', 'eviscerate', 'sacrifice', 'attack', 'devour']
+        const methodsThatNeedTarget = ['attack', 'bite', 'eviscerate', 'sacrifice', 'attack', 'devour', 'charge', 'scratch', 'aerialAttack', 'camoflaugeAttack']
         if (methodsThatNeedTarget.includes(randomMethod)) {
           animal1[randomMethod](animal2)
         } else {
@@ -182,6 +182,9 @@ export class Animal {
     this.food = food
     this.maxHealth = health
     this.health = health
+    this.nextLevelXP = 10
+    this.XP = 0
+    this.level = 1
   }
 
 
@@ -190,17 +193,34 @@ export class Animal {
   }
 
   eat() {
+    this.heal(1, false)
+    console.log(`${this.name} ate 1 ${this.food}. Current health: ${this.health}`)
+  }
+
+  heal(amount = 1, log = true) {
     if (this.health < this.maxHealth) {
-      this.health += 1
-      console.log(`${this.name} ate 1 ${this.food}. Current health: ${this.health}`)
+      this.health += amount
+      this.health = Math.min(this.health, this.maxHealth)
+      if (log) {
+        console.log(`${this.name} healed for ${amount} health.`)
+      }
     } else {
-      console.log(`${this.name} is already at max health: ${this.health}`)
+      if (log) {
+        console.log(`${this.name} (${this.species}) is already at max health. Does nothing.`)
+      }
     }
   }
 
-  attack(otherAnimal, damage = 5) {
-    console.log(`${this?.name || this.species} attacked ${otherAnimal?.name || otherAnimal.species} for ${damage} damage`)
-    otherAnimal.takeDamage(damage)
+  attack(otherAnimal, damage = 5, log = true) {
+    if (log) {
+      console.log(`${this?.name || this.species} attacked ${otherAnimal?.name || otherAnimal.species} for ${damage} damage`)
+    }
+    const damageGiven = damage * (this.level)
+    otherAnimal.takeDamage(damageGiven)
+    if (otherAnimal?.health <= 0) {
+      const XPGained = otherAnimal?.level * 2
+      this.gainXP(XPGained)
+    }
   }
 
   takeDamage(damage) {
@@ -210,6 +230,24 @@ export class Animal {
     } else {
       console.log(`${this?.name || this.species} took ${damage} damage. Current health: ${this.health}`)
     }
+  }
+
+  gainXP(XP, log = true) {
+    if (isNaN(XP) || XP < 1) return null
+    if (log) {
+      console.log(`${this.name} (${this.species}) gained ${XP} XP!`)
+    }
+    this.XP += XP
+    if (this.XP >= this.nextLevelXP) {
+      this.levelUp()
+    }
+  }
+
+  levelUp() {
+    console.log(`${this.name} (${this.species}) has leveled up!`)
+    this.level += 1
+    const nextLevelNeeded = this.nextLevelXP * 2
+    this.nextLevelXP = nextLevelNeeded
   }
 }
 
@@ -232,17 +270,21 @@ export class Dog extends Animal {
     return puppy
   }
 
-  devour() {
+  findBone() {
     if (this.health < this.maxHealth) {
-      this.health += 5
-      if (this.health > this.maxHealth) {
-        this.health = this.maxHealth
-      }
-      console.log(`${this.name} devoured ${this.food}. Current health: ${this.health}`)
+      this.heal(5, false)
+      console.log(`${this.name} found a bone! Plus 5 health! Current health: ${this.health}`)
     } else {
-      console.log(`${this.name} is already at max health: ${this.health}`)
+      console.log(`${this.name} found a bone! Plus 2 XP! Current XP: ${this.XP}`)
+      this.gainXP(2, false)
     }
   }
+
+  bite(otherAnimal) {
+    console.log(`${this?.name || this.species} bit ${otherAnimal?.name || otherAnimal.species}, inflicting ${7} damage`)
+    this.attack(otherAnimal, 7, false)
+  }
+
 }
 
 export class Cat extends Animal {
@@ -264,16 +306,19 @@ export class Cat extends Animal {
     return kitten
   }
 
-  devour() {
+  sleep() {
     if (this.health < this.maxHealth) {
-      this.health += 5
-      if (this.health > this.maxHealth) {
-        this.health = this.maxHealth
-      }
-      console.log(`${this.name} devoured ${this.food}. Current health: ${this.health}`)
+      this.heal(8, false)
+      console.log(`${this.name} found a nice spot to cuddle up! Plus 8 health! Current health: ${this.health}`)
     } else {
-      console.log(`${this.name} is already at max health: ${this.health}`)
+      console.log(`${this.name} found a nice spot to cuddle up! Plus 3 XP! Current XP: ${this.XP}`)
+      this.gainXP(3, false)
     }
+  }
+
+  scratch(otherAnimal) {
+    console.log(`${this?.name || this.species} scratched ${otherAnimal?.name || otherAnimal.species}, inflicting ${6} damage`)
+    this.attack(otherAnimal, 6, false)
   }
 }
 
@@ -296,16 +341,19 @@ export class Cow extends Animal {
     return calf
   }
 
-  devour() {
+  chewCud() {
     if (this.health < this.maxHealth) {
-      this.health += 5
-      if (this.health > this.maxHealth) {
-        this.health = this.maxHealth
-      }
-      console.log(`${this.name} devoured ${this.food}. Current health: ${this.health}`)
+      this.heal(4, false)
+      console.log(`${this.name} found grass and chewed some cud! Plus 4 health! Current health: ${this.health}`)
     } else {
-      console.log(`${this.name} is already at max health: ${this.health}`)
+      console.log(`${this.name} found grass and chewed some cud! Plus 1 XP! Current XP: ${this.XP}`)
+      this.gainXP(1, false)
     }
+  }
+
+  charge(otherAnimal) {
+    console.log(`${this?.name || this.species} charged ${otherAnimal?.name || otherAnimal.species}, inflicting ${10} damage`)
+    this.attack(otherAnimal, 10, false)
   }
 }
 
@@ -328,16 +376,19 @@ export class Falcon extends Animal {
     return chick
   }
 
-  devour() {
+  findWorm() {
     if (this.health < this.maxHealth) {
-      this.health += 5
-      if (this.health > this.maxHealth) {
-        this.health = this.maxHealth
-      }
-      console.log(`${this.name} devoured ${this.food}. Current health: ${this.health}`)
+      this.heal(5, false)
+      console.log(`${this.name} found a worm to eat! Plus 5 health! Current health: ${this.health}`)
     } else {
-      console.log(`${this.name} is already at max health: ${this.health}`)
+      console.log(`${this.name} found a worm to eat! Plus 5 XP! Current XP: ${this.XP}`)
+      this.gainXP(5, false)
     }
+  }
+
+  aerialAttack(otherAnimal) {
+    console.log(`${this?.name || this.species} attack dove on ${otherAnimal?.name || otherAnimal.species}, inflicting ${7} damage`)
+    this.attack(otherAnimal, 7, false)
   }
 }
 
@@ -360,80 +411,19 @@ export class Lizard extends Animal {
     return lizardBaby
   }
 
-  devour() {
+  eatBug() {
     if (this.health < this.maxHealth) {
-      this.health += 5
-      if (this.health > this.maxHealth) {
-        this.health = this.maxHealth
-      }
-      console.log(`${this.name} devoured ${this.food}. Current health: ${this.health}`)
+      this.heal(3, false)
+      console.log(`${this.name} found a bug to eat! Plus 3 health! Current health: ${this.health}`)
     } else {
-      console.log(`${this.name} is already at max health: ${this.health}`)
+      console.log(`${this.name} found a bug to eat! Plus 3 XP! Current XP: ${this.XP}`)
+      this.gainXP(3, false)
     }
   }
-}
 
-export class Snake extends Animal {
-  constructor(name) {
-    super("Snake", "Sssss!", "Rat", 20)
-    this.name = name
-  }
-
-  breedWith(other) {
-    if (!(other instanceof Snake)) return null
-
-    const childName = getChildName(this.name, other.name)
-    const childHealth = Math.floor((this.health + other.health) / 2)
-
-    console.log(`${this.name} and ${other.name} had snake babies!`)
-
-    const snakeBaby = new Snake(childName)
-    snakeBaby.health = childHealth
-    return snakeBaby
-  }
-
-  devour() {
-    if (this.health < this.maxHealth) {
-      this.health += 5
-      if (this.health > this.maxHealth) {
-        this.health = this.maxHealth
-      }
-      console.log(`${this.name} devoured ${this.food}. Current health: ${this.health}`)
-    } else {
-      console.log(`${this.name} is already at max health: ${this.health}`)
-    }
-  }
-}
-
-export class Turtle extends Animal {
-  constructor(name) {
-    super("Turle", "Clonk...", "Lettuce", 20)
-    this.name = name
-  }
-
-  breedWith(other) {
-    if (!(other instanceof Turtle)) return null
-
-    const childName = getChildName(this.name, other.name)
-    const childHealth = Math.floor((this.health + other.health) / 2)
-
-    console.log(`${this.name} and ${other.name} had baby turtles!`)
-
-    const babyTurtle = new Turtle(childName)
-    babyTurtle.health = childHealth
-    return babyTurtle
-  }
-
-  devour() {
-    if (this.health < this.maxHealth) {
-      this.health += 5
-      if (this.health > this.maxHealth) {
-        this.health = this.maxHealth
-      }
-      console.log(`${this.name} devoured ${this.food}. Current health: ${this.health}`)
-    } else {
-      console.log(`${this.name} is already at max health: ${this.health}`)
-    }
+  camoflaugeAttack(otherAnimal) {
+    console.log(`${this?.name || this.species} attacked ${otherAnimal?.name || otherAnimal.species} while in camoflauge, inflicting ${11} damage`)
+    this.attack(otherAnimal, 11, false)
   }
 }
 
@@ -448,10 +438,6 @@ world.addAnimal(new Falcon("Scretch"))
 world.addAnimal(new Falcon("Razeala"))
 world.addAnimal(new Lizard("Gleck"))
 world.addAnimal(new Lizard("Zazel"))
-world.addAnimal(new Snake("Tragal"))
-world.addAnimal(new Snake("Azula"))
-world.addAnimal(new Turtle("Grog"))
-world.addAnimal(new Turtle("Petunia"))
 
 const shell = new Shell(world)
 shell.start()
